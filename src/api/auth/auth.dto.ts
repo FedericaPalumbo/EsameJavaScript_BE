@@ -26,3 +26,13 @@ export class RegisterDto {
     @IsIn(USER_ROLES)
     role: UserRole;
 }
+
+//Copia e incolla dall'esempio in classe.
+//Lo yaml (requestBodies/Login) prevede username e password entrambi required
+export class LoginDto {
+    @IsEmail()
+    username: string;
+
+    @IsString()
+    password: string;
+}

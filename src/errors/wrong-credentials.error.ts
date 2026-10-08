@@ -1,7 +1,10 @@
 //errore che capita solo in fase di Login
-//stesso discorso di UserExistsError: il servizio non può "funzionare"
-//se le credenziali sono sbagliate, quindi lo lancio dal servizio
-//ed è il controller a decidere cosa tornare al client
+//a differenza di UserExistsError NON viene lanciato dal servizio: le credenziali
+//le verifica la strategia 'local' di passport (local-strategy.ts), che se sono
+//sbagliate non lancia nulla ma chiama done(null, false).
+//Quindi lo istanzio nel controller (login), nella callback di passport.authenticate,
+//quando user è false, ed è lì che decido cosa tornare al client:
+//Come UserExistsError non ha un middleware che lo gestisce: la risposta la costruisce il controller.
 
 export class WrongCredentialsError extends Error {
     constructor() {
