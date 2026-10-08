@@ -2,7 +2,7 @@ import { plainToClass } from "class-transformer";
 import { NextFunction, Response } from "express";
 import { validate as classValidate } from "class-validator";
 import { TypedRequest } from "./typed-request.interface";
-import { ValidationError } from "../errors/validadion-error";
+import { ValidationError } from "../errors/validation-error";
 
 function validateFn<T extends object>(dtoClass: new () => T, origin: 'body')
     : (req: TypedRequest<T, unknown, unknown>, res: Response, next: NextFunction) => Promise<void>;
