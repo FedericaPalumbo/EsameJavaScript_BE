@@ -14,6 +14,6 @@ app.use(bodyParser.json());
 
 app.use('/api', apiRouter);
 
-//app.use(errorHandlers);
+app.use(errorHandlers);
 
 export default app;
