@@ -1,4 +1,3 @@
-//perchè qui non devo aggiungere userExistsError?
 import { User } from "./user.entity";
 import { QueryUserDto } from "./user.dto";
 import { UserModel } from "./user.model";
