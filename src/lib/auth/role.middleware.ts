@@ -1,5 +1,5 @@
-//role.middleware.ts: controllo del ruolo a monte (come richiesto dal readme:
-//"api a cui un tipo di utente non può accedere: gradirei un middleware").
+//role.middleware.ts: controllo del ruolo a monte 
+//(Nel read.me c'è: "api a cui un tipo di utente non può accedere: gradirei un middleware").
 //Va messo DOPO isAuthenticated, perché si appoggia su req.user che viene
 //popolato dalla strategia jwt (jwt-strategy.ts).
 //Lo yaml vuole 404 (non 403) per l'utente col ruolo sbagliato: per questo
