@@ -1,4 +1,4 @@
-import { Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { TypedRequest } from '../../lib/typed-request.interface';
 import { QueryUserDto } from './user.dto';
 import userSrv from './user.service';
@@ -13,4 +13,8 @@ export const list = async (
     } catch (err) {
         next(err);
     }
+}
+
+export const me = async (req: Request, res: Response, next: NextFunction) => {
+    res.json(req.user);
 }
