@@ -1,7 +1,7 @@
 import { HydratedDocument, model, Schema } from "mongoose";
 import { Classroom } from "./classroom.entity";
 
-// Come cartItemSchema nel riferimento, con queste differenze:
+// Come cartItemSchema, con queste differenze:
 // - students e createdBy sono ref: 'User' (si salvano solo gli id)
 // - studentsCount è un virtual, non un campo salvato
 const classroomSchema = new Schema<Classroom>({
