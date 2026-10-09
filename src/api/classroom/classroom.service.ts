@@ -17,6 +17,14 @@ export class ClassroomService {
         return classrooms;
     }
 
+    // Come ProductService.getById(id) nel riferimento: findById torna già null se non trova nulla.
+    // NON popolo createdBy di proposito: chi la usa (es. AssignmentService) ha bisogno degli id
+    // per i controlli (createdBy e students), non dei dati del docente.
+    async getById(classroomId: string): Promise<Classroom | null> {
+        const classroom = await ClassroomModel.findById(classroomId);
+        return classroom;
+    }
+
     // Come CartItemService.add(item, userId): aggiungo al dato in ingresso l'id dell'utente
     // che crea (qui createdBy, là user), creo e ritorno il documento popolato.
     async add(classroom: Omit<Classroom, 'id' | 'createdBy' | 'studentsCount'>, teacherId: string): Promise<Classroom> {
