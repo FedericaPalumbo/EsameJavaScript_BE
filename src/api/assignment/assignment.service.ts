@@ -11,7 +11,7 @@ export class AssignmentService {
     // il docente che l'ha creata o uno studente iscritto (yaml: altrimenti 404).
     // Basta confrontare l'id con createdBy e con students, senza guardare il ruolo:
     // un docente non è mai in students e uno studente non è mai createdBy.
-    async find(classroomId: string, userId: string): Promise<Assignment[]> {
+    async find(classroomId: string, userId: string): Promise<AssignmentDocument[]> {
         const classroom = await classroomSrv.getById(classroomId);
         if (!classroom) {
             throw new NotFoundError();
@@ -59,7 +59,7 @@ export class AssignmentService {
     // NotFoundError: classe/attività inesistenti o non collegate, oppure lo studente non è nella lista.
     // AssignmentAlreadyCompletedError: lo studente ha già completato (come UserExistsError in
     // user.service, è il controller che decide cosa tornare al client: yaml 400).
-    async complete(classroomId: string, assignmentId: string, studentId: string): Promise<Assignment> {
+    async complete(classroomId: string, assignmentId: string, studentId: string): Promise<AssignmentDocument> {
         const assignment = await this._getById(assignmentId, classroomId);
         if (!assignment) {
             throw new NotFoundError();
