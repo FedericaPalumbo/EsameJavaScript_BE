@@ -1,4 +1,4 @@
-import { ArrayUnique, IsArray, IsMongoId, IsNotEmpty, IsString } from "class-validator";
+import { ArrayUnique, IsArray, IsMongoId, IsNotEmpty, IsString, MaxLength } from "class-validator";
 
 // Rispecchia requestBodies/Classroom dello yaml: name e students sono entrambi required.
 // Come CreateCartItemDto nel riferimento (productId: @IsMongoId), gli id sono validati
@@ -6,6 +6,8 @@ import { ArrayUnique, IsArray, IsMongoId, IsNotEmpty, IsString } from "class-val
 export class CreateClassroomDto {
     @IsString()
     @IsNotEmpty()
+    // limite sulla lunghezza del nome (stesso valore del form Angular)
+    @MaxLength(30)
     name: string;
 
     // ArrayUnique evita doppioni, altrimenti studentsCount (students.length) sarebbe falsato
