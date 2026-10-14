@@ -75,9 +75,28 @@ export class AssignmentService {
         }
 
         student.completed = true;
+        student.completedAt = new Date();
         const updated = await assignment.save();
 
         return updated.populate('createdBy');
+    }
+
+    // Dettaglio di una attività per il docente, con la lista degli studenti (chi ha completato e chi no).
+    // Come add: il docente deve essere il creatore della classe, altrimenti NotFoundError (yaml: 404).
+    // _getById copre già attività inesistente o non collegata alla classe.
+    // Popolo createdBy e students.studentId: servono i dati degli studenti (nome, foto), non solo gli id.
+    async getDetail(classroomId: string, assignmentId: string, teacherId: string): Promise<AssignmentDocument> {
+        const classroom = await classroomSrv.getById(classroomId);
+        if (!classroom || classroom.createdBy.toString() !== teacherId) {
+            throw new NotFoundError();
+        }
+
+        const assignment = await this._getById(assignmentId, classroomId);
+        if (!assignment) {
+            throw new NotFoundError();
+        }
+
+        return assignment.populate(['createdBy', 'students.studentId']);
     }
 }
 

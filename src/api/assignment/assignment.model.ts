@@ -5,12 +5,13 @@ import { Assignment, AssignmentStudent } from "./assignment.entity";
 // _id: false perché non serve un id per ogni elemento (si identifica con studentId)
 const assignmentStudentSchema = new Schema<AssignmentStudent>({
     studentId: { type: Schema.Types.ObjectId, ref: 'User' },
-    completed: { type: Boolean, default: false }
+    completed: { type: Boolean, default: false },
+    completedAt: { type: Date }
 }, { _id: false });
 
 // Come cartItemSchema, con queste differenze:
 // - classroom e createdBy sono ref (si salvano solo gli id)
-// - students contiene { studentId, completed }
+// - students contiene { studentId, completed, completedAt }
 // - studentsCount e completedCount sono virtual, non campi salvati
 const assignmentSchema = new Schema<Assignment>({
     title: String,

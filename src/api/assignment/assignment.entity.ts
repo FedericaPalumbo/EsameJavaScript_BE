@@ -7,6 +7,9 @@ import { User } from "../user/user.entity";
 export interface AssignmentStudent {
     studentId: string | User;
     completed: boolean;
+    // data in cui lo studente ha completato l'attività. Opzionale: resta vuota finché
+    // non completa (e nelle attività create prima dell'introduzione del campo)
+    completedAt?: Date;
 }
 
 export interface Assignment {
@@ -26,4 +29,7 @@ export interface Assignment {
     // SOLO PER STUDENTI: non è nello schema, dipende dall'utente che chiama l'API.
     // Si aggiunge da codice (service/controller) dopo toObject()
     completed?: boolean;
+    // SOLO PER STUDENTI: data in cui lo studente che chiama l'API ha completato l'attività.
+    // Come completed, dipende dall'utente: si aggiunge da codice
+    completedAt?: Date;
 }
