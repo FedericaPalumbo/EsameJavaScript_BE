@@ -7,7 +7,7 @@ export class CreateClassroomDto {
     @IsString()
     @IsNotEmpty()
     // limite sulla lunghezza del nome (stesso valore del form Angular)
-    @MaxLength(30)
+    @MaxLength(12)
     name: string;
 
     // ArrayUnique evita doppioni, altrimenti studentsCount (students.length) sarebbe falsato
