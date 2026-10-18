@@ -1,9 +1,11 @@
 import { Response, NextFunction } from 'express';
 import assignmentSrv from './assignment.service';
+import classroomSrv from '../classroom/classroom.service';
 import { TypedRequest } from '../../lib/typed-request.interface';
 import { CreateAssignmentDto } from './assignment.dto';
 import { AssignmentIdParams, ClassroomIdParams } from '../../lib/id-params';
 import { AssignmentAlreadyCompletedError } from '../../errors/assignment-already-completed.error';
+import { NotFoundError } from '../../errors/not-found.error';
 import { AssignmentDocument } from './assignment.model';
 
 // Campi che dipendono dall'utente che chiama l'API (non possono essere virtual): completed e
@@ -20,11 +22,27 @@ const withStudentFields = (doc: AssignmentDocument, studentId: string) => {
 // DOCENTE: le attività con i conteggi. STUDENTE: le stesse attività + il campo completed.
 // completed dipende dall'utente che chiama l'API, quindi non può essere un virtual: lo calcolo
 // qui dal documento (students contiene { studentId, completed, completedAt }) con withStudentFields.
-// Il controllo di accesso alla classe (404) è nel service: se non è lecito lancia NotFoundError.
+// Controllo di accesso alla classe (yaml: 404): come add di cart-item.controller con productSrv.getById,
+// recupero la classe e lancio NotFoundError se non esiste o se l'utente non può vederla.
+// Basta confrontare l'id con createdBy e con students, senza guardare il ruolo:
+// un docente non è mai in students e uno studente non è mai createdBy.
 export const list = async (req: TypedRequest<unknown, unknown, ClassroomIdParams>, res: Response, next: NextFunction) => {
     try {
         const user = req.user!;
-        const results = await assignmentSrv.find(req.params.classroomId, user.id);
+        const classroomId = req.params.classroomId;
+
+        const classroom = await classroomSrv.getById(classroomId);
+        if (!classroom) {
+            throw new NotFoundError();
+        }
+
+        const isCreator = classroom.createdBy.toString() === user.id;
+        const isEnrolled = classroom.students.some(studentId => studentId.toString() === user.id);
+        if (!isCreator && !isEnrolled) {
+            throw new NotFoundError();
+        }
+
+        const results = await assignmentSrv.find(classroomId);
 
         if (user.role === 'student') {
             res.json(results.map(doc => withStudentFields(doc, user.id)));
@@ -36,14 +54,28 @@ export const list = async (req: TypedRequest<unknown, unknown, ClassroomIdParams
     }
 }
 
-// Come add di classroom.controller: lo yaml prevede 201 per POST /classrooms/{classroomId}/assignments.
+// Come add di cart-item.controller: recupero la classe (là il prodotto), lancio NotFoundError se non
+// esiste o se non è stata creata da questo docente (yaml: 404), poi costruisco toAdd e chiamo il service.
+// students: copio gli studenti della classe, tutti con completed = false.
+// Lo yaml prevede 201 per POST /classrooms/{classroomId}/assignments.
 // Il controllo "solo docenti" non è qui: lo fa isTeacher nel router.
-// Il controllo "classe esistente e creata da questo docente" è nel service (NotFoundError).
 export const add = async (req: TypedRequest<CreateAssignmentDto, unknown, ClassroomIdParams>, res: Response, next: NextFunction) => {
     try {
         const { title } = req.body;
+        const classroomId = req.params.classroomId;
 
-        const result = await assignmentSrv.add({ title }, req.params.classroomId, req.user!.id);
+        const classroom = await classroomSrv.getById(classroomId);
+        if (!classroom || classroom.createdBy.toString() !== req.user!.id) {
+            throw new NotFoundError();
+        }
+
+        const toAdd = {
+            title,
+            classroom: classroomId,
+            students: classroom.students.map(studentId => ({ studentId, completed: false }))
+        }
+
+        const result = await assignmentSrv.add(toAdd, req.user!.id);
 
         res.status(201);
         res.json(result);
@@ -54,15 +86,25 @@ export const add = async (req: TypedRequest<CreateAssignmentDto, unknown, Classr
 
 // BONUS: dettaglio di una attività per il docente, con l'elenco degli studenti che hanno
 // (o non hanno) completato e la data di completamento.
+// Come detail di cart-item.controller: `if (!item) throw new NotFoundError()`, due volte:
+// - la classe non esiste o non è di questo docente (yaml: 404)
+// - il service torna null: attività inesistente o non collegata alla classe
 // Il controllo "solo docenti" non è qui: lo fa isTeacher nel router.
-// Il controllo "classe creata da questo docente / attività della classe" è nel service (NotFoundError).
 // toJSON() dell'attività toglie students, quindi lo rimetto io in forma { student, completed, completedAt }:
 // s.studentId è popolato, res.json ne chiama il toJSON (id, fullName, picture...).
 export const detail = async (req: TypedRequest<unknown, unknown, AssignmentIdParams>, res: Response, next: NextFunction) => {
     try {
         const { classroomId, id } = req.params;
 
-        const result = await assignmentSrv.getDetail(classroomId, id, req.user!.id);
+        const classroom = await classroomSrv.getById(classroomId);
+        if (!classroom || classroom.createdBy.toString() !== req.user!.id) {
+            throw new NotFoundError();
+        }
+
+        const result = await assignmentSrv.getDetail(classroomId, id);
+        if (!result) {
+            throw new NotFoundError();
+        }
 
         res.json({
             ...result.toJSON(),
@@ -77,9 +119,9 @@ export const detail = async (req: TypedRequest<unknown, unknown, AssignmentIdPar
     }
 }
 
-// Come updateQuantity di cart-item.controller, ma con due differenze:
-// - il NotFoundError lo lancia già il service (classe/attività inesistenti o non collegate)
-// - AssignmentAlreadyCompletedError lo gestisco qui come register con UserExistsError: yaml 400
+// Come updateQuantity di cart-item.controller: `if (!updated) throw new NotFoundError()`.
+// Il service torna null se classe/attività inesistenti o non collegate, o se lo studente non è nella lista.
+// AssignmentAlreadyCompletedError lo gestisco qui come register con UserExistsError: yaml 400
 // Il controllo "solo studenti" non è qui: lo fa isStudent nel router.
 // Chi arriva qui è uno studente e l'ha appena completata: withStudentFields torna completed true
 // e la data di completamento appena salvata.
@@ -88,6 +130,9 @@ export const complete = async (req: TypedRequest<unknown, unknown, AssignmentIdP
         const { classroomId, id } = req.params;
 
         const result = await assignmentSrv.complete(classroomId, id, req.user!.id);
+        if (!result) {
+            throw new NotFoundError();
+        }
 
         res.json(withStudentFields(result, req.user!.id));
     } catch (err) {

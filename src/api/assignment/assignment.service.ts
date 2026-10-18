@@ -1,47 +1,24 @@
-import { NotFoundError } from '../../errors/not-found.error';
 import { AssignmentAlreadyCompletedError } from '../../errors/assignment-already-completed.error';
-import classroomSrv from '../classroom/classroom.service';
 import { Assignment } from './assignment.entity';
 import { AssignmentDocument, AssignmentModel } from './assignment.model';
 
 export class AssignmentService {
 
     // Come CartItemService.find(userId) nel riferimento: filtro + populate del campo con ref.
-    // Qui, prima del filtro, c'è il controllo di accesso alla classe: la può vedere solo
-    // il docente che l'ha creata o uno studente iscritto (yaml: altrimenti 404).
-    // Basta confrontare l'id con createdBy e con students, senza guardare il ruolo:
-    // un docente non è mai in students e uno studente non è mai createdBy.
-    async find(classroomId: string, userId: string): Promise<AssignmentDocument[]> {
-        const classroom = await classroomSrv.getById(classroomId);
-        if (!classroom) {
-            throw new NotFoundError();
-        }
-
-        const isCreator = classroom.createdBy.toString() === userId;
-        const isEnrolled = classroom.students.some(studentId => studentId.toString() === userId);
-        if (!isCreator && !isEnrolled) {
-            throw new NotFoundError();
-        }
-
+    // Il controllo di accesso alla classe (404) NON è qui: lo fa il controller prima di chiamare
+    // il service, come add di cart-item.controller con productSrv.getById.
+    async find(classroomId: string): Promise<AssignmentDocument[]> {
         const assignments = await AssignmentModel.find({ classroom: classroomId }).populate('createdBy');
         return assignments;
     }
 
-    // Come CartItemService.add(item, userId): aggiungo al dato in ingresso i campi che non
-    // arrivano dal client (classroom, createdBy e students), creo e ritorno il documento popolato.
-    // Il docente deve essere il creatore della classe (yaml: altrimenti 404).
-    // students: copio gli studenti della classe, tutti con completed = false.
-    async add(assignment: Pick<Assignment, 'title'>, classroomId: string, teacherId: string): Promise<Assignment> {
-        const classroom = await classroomSrv.getById(classroomId);
-        if (!classroom || classroom.createdBy.toString() !== teacherId) {
-            throw new NotFoundError();
-        }
-
+    // Come CartItemService.add(item, userId): aggiungo al dato in ingresso il campo che non
+    // arriva dal client (createdBy, là user), creo e ritorno il documento popolato.
+    // classroom e students li costruisce il controller (come quantity e product in cart-item.controller).
+    async add(assignment: Pick<Assignment, 'title' | 'classroom' | 'students'>, teacherId: string): Promise<Assignment> {
         const toAdd = {
             ...assignment,
-            classroom: classroomId,
-            createdBy: teacherId,
-            students: classroom.students.map(studentId => ({ studentId, completed: false }))
+            createdBy: teacherId
         }
         const newAssignment = await AssignmentModel.create(toAdd);
         return newAssignment.populate('createdBy');
@@ -55,19 +32,28 @@ export class AssignmentService {
         return assignment ?? null;
     }
 
+    // Come CartItemService.getById: torna null se non trova nulla, sarà il controller a lanciare NotFoundError.
+    // Popolo createdBy e students.studentId: servono i dati degli studenti (nome, foto), non solo gli id.
+    async getDetail(classroomId: string, assignmentId: string): Promise<AssignmentDocument | null> {
+        const assignment = await this._getById(assignmentId, classroomId);
+
+        return !!assignment ? assignment.populate(['createdBy', 'students.studentId']) : null;
+    }
+
     // Come CartItemService.update: recupero il documento, lo modifico e faccio save().
-    // NotFoundError: classe/attività inesistenti o non collegate, oppure lo studente non è nella lista.
-    // AssignmentAlreadyCompletedError: lo studente ha già completato (come UserExistsError in
-    // user.service, è il controller che decide cosa tornare al client: yaml 400).
-    async complete(classroomId: string, assignmentId: string, studentId: string): Promise<AssignmentDocument> {
+    // Torna null (come update nel riferimento) se classe/attività inesistenti o non collegate,
+    // oppure se lo studente non è nella lista: sarà il controller a lanciare NotFoundError.
+    // AssignmentAlreadyCompletedError invece resta nel service (come UserExistsError in user.service):
+    // è il controller che decide cosa tornare al client (yaml 400).
+    async complete(classroomId: string, assignmentId: string, studentId: string): Promise<AssignmentDocument | null> {
         const assignment = await this._getById(assignmentId, classroomId);
         if (!assignment) {
-            throw new NotFoundError();
+            return null;
         }
 
         const student = assignment.students.find(s => s.studentId.toString() === studentId);
         if (!student) {
-            throw new NotFoundError();
+            return null;
         }
 
         if (student.completed) {
@@ -79,24 +65,6 @@ export class AssignmentService {
         const updated = await assignment.save();
 
         return updated.populate('createdBy');
-    }
-
-    // Dettaglio di una attività per il docente, con la lista degli studenti (chi ha completato e chi no).
-    // Come add: il docente deve essere il creatore della classe, altrimenti NotFoundError (yaml: 404).
-    // _getById copre già attività inesistente o non collegata alla classe.
-    // Popolo createdBy e students.studentId: servono i dati degli studenti (nome, foto), non solo gli id.
-    async getDetail(classroomId: string, assignmentId: string, teacherId: string): Promise<AssignmentDocument> {
-        const classroom = await classroomSrv.getById(classroomId);
-        if (!classroom || classroom.createdBy.toString() !== teacherId) {
-            throw new NotFoundError();
-        }
-
-        const assignment = await this._getById(assignmentId, classroomId);
-        if (!assignment) {
-            throw new NotFoundError();
-        }
-
-        return assignment.populate(['createdBy', 'students.studentId']);
     }
 }
 
