@@ -17,12 +17,21 @@ export class ClassroomService {
         return classrooms;
     }
 
-    // Come ProductService.getById(id) nel riferimento: findById torna già null se non trova nulla.
-    // NON popolo createdBy di proposito: chi la usa (es. AssignmentService) ha bisogno degli id
-    // per i controlli (createdBy e students), non dei dati del docente.
-    async getById(classroomId: string): Promise<Classroom | null> {
-        const classroom = await ClassroomModel.findById(classroomId);
-        return classroom;
+    // Come CartItem _getById(id, userId) nel riferimento: il controllo di accesso è un filtro della query,
+    // findOne({ _id, user }) là, findOne({ _id, createdBy }) qui. Se la classe non esiste oppure non è di
+    // questo docente torna null, sarà il controller a lanciare NotFoundError (yaml: 404).
+    // NON popolo createdBy di proposito: chi la usa (es. assignment.controller) ha bisogno degli id
+    // (students) per costruire l'attività, non dei dati del docente.
+    async getByIdForTeacher(classroomId: string, teacherId: string): Promise<Classroom | null> {
+        const classroom = await ClassroomModel.findOne({ _id: classroomId, createdBy: teacherId });
+        return classroom ?? null;
+    }
+
+    // Come getByIdForTeacher, ma per lo studente: come in findByStudent, mongoose su un array di ref
+    // confronta il valore con ogni elemento dell'array (non serve $in).
+    async getByIdForStudent(classroomId: string, studentId: string): Promise<Classroom | null> {
+        const classroom = await ClassroomModel.findOne({ _id: classroomId, students: studentId });
+        return classroom ?? null;
     }
 
     // Come CartItemService.add(item, userId): aggiungo al dato in ingresso l'id dell'utente

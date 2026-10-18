@@ -23,22 +23,19 @@ const withStudentFields = (doc: AssignmentDocument, studentId: string) => {
 // completed dipende dall'utente che chiama l'API, quindi non può essere un virtual: lo calcolo
 // qui dal documento (students contiene { studentId, completed, completedAt }) con withStudentFields.
 // Controllo di accesso alla classe (yaml: 404): come add di cart-item.controller con productSrv.getById,
-// recupero la classe e lancio NotFoundError se non esiste o se l'utente non può vederla.
-// Basta confrontare l'id con createdBy e con students, senza guardare il ruolo:
-// un docente non è mai in students e uno studente non è mai createdBy.
+// chiamo il service della classe (là il prodotto) e lancio NotFoundError se torna null.
+// Il filtro (createdBy per il docente, students per lo studente) è nella query del classroomSrv,
+// come findOne({ _id, user }) nel riferimento: qui scelgo solo il metodo in base al ruolo,
+// come fa classroom.controller con findByTeacher / findByStudent.
 export const list = async (req: TypedRequest<unknown, unknown, ClassroomIdParams>, res: Response, next: NextFunction) => {
     try {
         const user = req.user!;
         const classroomId = req.params.classroomId;
 
-        const classroom = await classroomSrv.getById(classroomId);
+        const classroom = user.role === 'teacher'
+            ? await classroomSrv.getByIdForTeacher(classroomId, user.id)
+            : await classroomSrv.getByIdForStudent(classroomId, user.id);
         if (!classroom) {
-            throw new NotFoundError();
-        }
-
-        const isCreator = classroom.createdBy.toString() === user.id;
-        const isEnrolled = classroom.students.some(studentId => studentId.toString() === user.id);
-        if (!isCreator && !isEnrolled) {
             throw new NotFoundError();
         }
 
@@ -54,8 +51,9 @@ export const list = async (req: TypedRequest<unknown, unknown, ClassroomIdParams
     }
 }
 
-// Come add di cart-item.controller: recupero la classe (là il prodotto), lancio NotFoundError se non
-// esiste o se non è stata creata da questo docente (yaml: 404), poi costruisco toAdd e chiamo il service.
+// Come add di cart-item.controller: recupero la classe (là il prodotto) con getByIdForTeacher, lancio
+// NotFoundError se non esiste o se non è stata creata da questo docente (yaml: 404), poi costruisco toAdd
+// e chiamo il service.
 // students: copio gli studenti della classe, tutti con completed = false.
 // Lo yaml prevede 201 per POST /classrooms/{classroomId}/assignments.
 // Il controllo "solo docenti" non è qui: lo fa isTeacher nel router.
@@ -64,8 +62,8 @@ export const add = async (req: TypedRequest<CreateAssignmentDto, unknown, Classr
         const { title } = req.body;
         const classroomId = req.params.classroomId;
 
-        const classroom = await classroomSrv.getById(classroomId);
-        if (!classroom || classroom.createdBy.toString() !== req.user!.id) {
+        const classroom = await classroomSrv.getByIdForTeacher(classroomId, req.user!.id);
+        if (!classroom) {
             throw new NotFoundError();
         }
 
@@ -87,7 +85,7 @@ export const add = async (req: TypedRequest<CreateAssignmentDto, unknown, Classr
 // BONUS: dettaglio di una attività per il docente, con l'elenco degli studenti che hanno
 // (o non hanno) completato e la data di completamento.
 // Come detail di cart-item.controller: `if (!item) throw new NotFoundError()`, due volte:
-// - la classe non esiste o non è di questo docente (yaml: 404)
+// - la classe non esiste o non è di questo docente (yaml: 404): getByIdForTeacher torna null
 // - il service torna null: attività inesistente o non collegata alla classe
 // Il controllo "solo docenti" non è qui: lo fa isTeacher nel router.
 // toJSON() dell'attività toglie students, quindi lo rimetto io in forma { student, completed, completedAt }:
@@ -96,8 +94,8 @@ export const detail = async (req: TypedRequest<unknown, unknown, AssignmentIdPar
     try {
         const { classroomId, id } = req.params;
 
-        const classroom = await classroomSrv.getById(classroomId);
-        if (!classroom || classroom.createdBy.toString() !== req.user!.id) {
+        const classroom = await classroomSrv.getByIdForTeacher(classroomId, req.user!.id);
+        if (!classroom) {
             throw new NotFoundError();
         }
 
