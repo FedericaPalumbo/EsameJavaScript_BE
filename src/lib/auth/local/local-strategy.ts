@@ -1,6 +1,6 @@
 //cerca l'identitità per credentials.username,
 // confronta la password con bcrypt.compare e restituisce l’utente (identity.toObject().user).
-// Il populate('user') lo fa già il pre('findOne') del tuo user-identity.model.ts. 
+// Il populate('user') lo fa già il pre('findOne') del user-identity.model.ts. 
 
 
 //Copia e incolla dall'esempio in classe: tranne la gestione di segnalazione errori: per sicurezza non ho voluto
